@@ -143,16 +143,13 @@ function validateBookmark(myLevel,myName,myPage){
 		if( cur +1 < myLevel[i] ){ strError += "Space indent incorrect: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
 		else if( isStrEmpty(myName[i]) ) {strError += "Name is empty: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
 		else if( MAX_BOOKMARK_NAME < myName[i].length ){strError += "Name too long: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
-		else if( String(myPage[i]) == NO_PAGE_CHAR ){strError += "Page not set: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( String(myPage[i]) == NO_PAGE_CHAR ){strError += "PageNum not set: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
 		else {bFault = false;}
 		
 		cur = myLevel[i]; //update level
 		if( bFault ){
 			line++;
-			if( line >= maxline ){
-				strError += "......";
-				break;
-			}
+			if( line >= maxline ){strError += "......";	break;}
 		}
 	}
 	if( !isStrEmpty(strError) ) app.alert(strError);
@@ -172,8 +169,7 @@ function createBookmark(bkm,cur,index,basePage,myLevel,myName,myPage){
 		} else{//equal
 			bkm.createChild(myName[i],"this.pageNum=" +((myPage[i]==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
 			i++; //next element
-		}
-		
+		} // end if
 	}//end of while
 	return i;
 }
@@ -182,7 +178,8 @@ function exportBookmarkLevel(doc,bkm,cur,myLevel,myName,myPage){
 	if( bkm.children == null ) return;
 	for( var i=0;i<bkm.children.length;i++){
 		myLevel.push(cur);
-		myName.push(bkm.children[i].name);
+		var bnames = splitString(bkm.children[i].name, /\r|\n|  /); //at least two white space
+		myName.push(bnames.join(" "));
 		bkm.children[i].execute();
 		myPage.push(doc.pageNum);
 		exportBookmarkLevel(doc,bkm.children[i],cur+1,myLevel,myName,myPage);
@@ -212,10 +209,8 @@ function exportBookmarkString(doc,bkm){
 		str += myName[i] + SEP_CHAR+SEP_CHAR +space ; //Tab键分隔
 		str += (myPage[i]+basePage) + "\n";
 	}
-	//this.pageNum = 0;  //got to first page
-	doc.pageNum = 0;
 	
-	//app.alert("basePage=" + basePage + ",level=" + myLevel+",name=" + myName+",page=" + myPage);
+	doc.pageNum = 0; //this.pageNum = 0;  //got to first page
 	validateBookmark(myLevel,myName,myPage); //check bookmark error!
 	
 	return str;
@@ -249,8 +244,6 @@ function importBookmark() {
 	var basePage = readBasePage();
 	if( isStrNull(basePage) ) return;
 	
-	//app.alert("basePage=" + basePage + ",level=" + myLevel+",name=" + myName+",page=" + myPage);
-	
 	validateBookmark(myLevel,myName,myPage); //check bookmark error!
 	
 	this.bookmarkRoot.remove();
@@ -283,7 +276,7 @@ function exportBookmark(){
 	this.createDataObject("Bookmark.txt", "");
 	var oFile = util.streamFromString( strOut , "utf-8");
 	this.setDataObjectContents("Bookmark.txt", oFile);
-	var res = this.exportDataObject("Bookmark.txt");
+	this.exportDataObject("Bookmark.txt");
 	this.removeDataObject("Bookmark.txt");
 	
 	app.alert("导出成功!");
