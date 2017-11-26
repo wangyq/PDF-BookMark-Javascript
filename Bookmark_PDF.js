@@ -22,9 +22,9 @@ app.addMenuItem({
 	cEnable : "event.rc= (event.target != null);" //当有文档打开时(event.target != null)才可用
 });
 
-//注释字符
-var COMMENT_CHAR="#";
-
+var COMMENT_CHAR="#";   //注释字符
+var MAX_BOOKMARK_NAME = 120; //最长书签名称
+var NO_PAGE_CHAR = "";  //页码未设置
 //分隔符号的常量
 var SEP_CHAR="\t";
 var SEP_SPACE="    ";
@@ -61,8 +61,8 @@ function parseInputPage(strStr,strReg){
 	var basePage = null;
 	var pp = splitString(strStr,strReg); //分隔字符串
 	if( pp.length >=2 ){
-		if( !isNaN(pp[0]) && !isNaN(pp[1]) ){
-			basePage = isNaN(pp[1]) - isNaN(pp[0]) -1 ; //PDF内部的页码从0开始
+		if( !isNaN(Number(pp[0])) && !isNaN(Number(pp[1])) ){
+			basePage = Number(pp[1]) - Number(pp[0]) -1 ; //PDF内部的页码从0开始
 		}
 	}
 	return basePage;
@@ -118,9 +118,9 @@ function parseBookmarkArray(myArr,myLevel,myName,myPage){
 		var items = splitString(myRow,SEP_STR); //以Tab键或者连续4个空格切割字符串
 		if( items.length >=1) myName.push(items[0]);  //书签的名称
 		if( items.length >=2 ){
-			myPage.push(isNaN(items[1])?0:Number(items[1]));  //书签的页码
+			myPage.push(isNaN(Number(items[1]))?NO_PAGE_CHAR:Number(items[1]));  //书签的页码
 		}else{
-			myPage.push(0);
+			myPage.push(NO_PAGE_CHAR);    //no page found!
 		}
 	}
 }
@@ -133,20 +133,44 @@ function openBookmark(bkm,st) { //折叠/打开所有书签
 	}
 	bkm.open = st; //open/collapse this node!
 }
+function validateBookmark(myLevel,myName,myPage){
+	var strError = "";
+	var maxline = 20, line=0;
+	var cur = 0;
+	for(var i=0;i<myLevel.length;i++){
+		var bFault = true;
+		
+		if( cur +1 < myLevel[i] ){ strError += "Space indent incorrect: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( isStrEmpty(myName[i]) ) {strError += "Name is empty: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( MAX_BOOKMARK_NAME < myName[i].length ){strError += "Name too long: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( String(myPage[i]) == NO_PAGE_CHAR ){strError += "Page not set: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else {bFault = false;}
+		
+		cur = myLevel[i]; //update level
+		if( bFault ){
+			line++;
+			if( line >= maxline ){
+				strError += "......";
+				break;
+			}
+		}
+	}
+	if( !isStrEmpty(strError) ) app.alert(strError);
+}
+
 function createBookmark(bkm,cur,index,basePage,myLevel,myName,myPage){
 	var i = index;
 	while( i < myLevel.length){ //not end!
 		if( cur > myLevel[i] ) break;  //end now!
 		else if( cur < myLevel[i] ){ //sub menu
 			if( bkm.children == null ){
-				app.alert("Error: no parent node! " + myName[i] + " " + myPage[i]); //Error 
-				bkm.createChild(myName[i],"this.pageNum=" +(basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
+				//app.alert("Error: no parent node! " + myName[i] + " " + myPage[i]); //Error
+				bkm.createChild(myName[i],"this.pageNum=" +((myPage[i]==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
 				return i+1;
 			}
 			i = createBookmark(bkm.children[bkm.children.length-1],cur+1,i,basePage,myLevel,myName,myPage); //sub 
-		} else{
-			//equal
-			bkm.createChild(myName[i],"this.pageNum=" +(basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
+		} else{//equal
+			bkm.createChild(myName[i],"this.pageNum=" +((myPage[i]==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
 			i++; //next element
 		}
 		
@@ -173,7 +197,7 @@ function exportBookmarkString(doc,bkm){
 	
 	var str = "";
 	var width = 75;
-	var base = 1;
+	var basePage = 1;
 	for(var i=0;i<myLevel.length;i++){
 		var l = myLevel[i];
 		var space = "";
@@ -186,10 +210,14 @@ function exportBookmarkString(doc,bkm){
 			l--;
 		}
 		str += myName[i] + SEP_CHAR+SEP_CHAR +space ; //Tab键分隔
-		str += (myPage[i]+base) + "\n";
+		str += (myPage[i]+basePage) + "\n";
 	}
 	//this.pageNum = 0;  //got to first page
 	doc.pageNum = 0;
+	
+	//app.alert("basePage=" + basePage + ",level=" + myLevel+",name=" + myName+",page=" + myPage);
+	validateBookmark(myLevel,myName,myPage); //check bookmark error!
+	
 	return str;
 }
 //===========================================================
@@ -223,6 +251,8 @@ function importBookmark() {
 	
 	//app.alert("basePage=" + basePage + ",level=" + myLevel+",name=" + myName+",page=" + myPage);
 	
+	validateBookmark(myLevel,myName,myPage); //check bookmark error!
+	
 	this.bookmarkRoot.remove();
 	createBookmark(this.bookmarkRoot,0,0,basePage,myLevel,myName,myPage);
 	
@@ -253,8 +283,8 @@ function exportBookmark(){
 	this.createDataObject("Bookmark.txt", "");
 	var oFile = util.streamFromString( strOut , "utf-8");
 	this.setDataObjectContents("Bookmark.txt", oFile);
-	this.exportDataObject("Bookmark.txt");
+	var res = this.exportDataObject("Bookmark.txt");
 	this.removeDataObject("Bookmark.txt");
-
+	
 	app.alert("导出成功!");
 }
