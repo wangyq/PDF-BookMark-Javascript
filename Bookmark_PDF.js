@@ -140,10 +140,10 @@ function validateBookmark(myLevel,myName,myPage){
 	for(var i=0;i<myLevel.length;i++){
 		var bFault = true;
 		
-		if( cur +1 < myLevel[i] ){ strError += "Space indent incorrect: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
-		else if( isStrEmpty(myName[i]) ) {strError += "Name is empty: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
-		else if( MAX_BOOKMARK_NAME < myName[i].length ){strError += "Name too long: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
-		else if( String(myPage[i]) == NO_PAGE_CHAR ){strError += "PageNum not set: " + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		if( cur +1 < myLevel[i] ){ strError += "Space indent incorrect: \t" + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( isStrEmpty(myName[i]) ) {strError += "Name is empty: \t" + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( MAX_BOOKMARK_NAME < myName[i].length ){strError += "Name too long: \t" + myName[i] + SEP_CHAR + myPage[i] + "\n";}
+		else if( String(myPage[i]) == NO_PAGE_CHAR ){strError += "PageNum not set: \t" + myName[i] + SEP_CHAR + myPage[i] + "\n";}
 		else {bFault = false;}
 		
 		cur = myLevel[i]; //update level
@@ -244,7 +244,6 @@ function importBookmark() {
 	var basePage = readBasePage();
 	if( isStrNull(basePage) ) return;
 	
-	//app.alert("basePage=" + basePage + ",level=" + myLevel+",name=" + myName+",page=" + myPage);
 	validateBookmark(myLevel,myName,myPage); //check bookmark error!
 	
 	this.bookmarkRoot.remove();
