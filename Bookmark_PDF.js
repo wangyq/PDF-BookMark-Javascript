@@ -31,53 +31,53 @@ var SEP_SPACE="    ";
 var SEP_STR=/\t|    /;
 
 function isStrNull(strStr){
-	if( strStr == null || strStr == undefined ){
-		return true;
-	}
+	if( strStr == null || strStr == undefined ){return true;}
 	return false;
+}
+function strTrim(strStr){//去掉头尾空白字符
+	if( !isStrNull(strStr) ) return strStr.replace(/(^\s*)|(\s*$)/g, "");
+	return "";
 }
 function isStrEmpty(strStr){
-	if( strStr == null || strStr == undefined || strStr.replace(/(^\s*)|(\s*$)/g, "").length ==0 ){
-		return true;
-	}
-	return false;
+	return strTrim(strStr).length == 0;
 }
-
-//------------------------------------
-//
-//
+function isInteger(strStr){
+	return (/^(0|[1-9][0-9]*)$/).test(strTrim(String(strStr)));
+}
 function splitString(strStr,strReg){
 	var arrResult = new Array();
-	if( !isStrEmpty(strStr) && !isStrNull(strReg) ){ //非空字符串	
+	if( !isStrEmpty(strStr) ){ //非空字符串	
 		var arr = strStr.split(strReg); //分隔字符串
 		for(var i=0;i<arr.length;i++){
 			if( isStrEmpty(arr[i]) ) continue;
-			arrResult.push(arr[i].replace(/(^\s*)|(\s*$)/g, "")); //去掉头尾空白字符
+			arrResult.push(strTrim(arr[i])); //去掉头尾空白字符
 		}
 	}
 	return arrResult;
 }
 function parseInputPage(strStr,strReg){
 	var basePage = null;
-	var pp = splitString(strStr,strReg); //分隔字符串
-	if( pp.length >=2 ){
-		if( !isNaN(Number(pp[0])) && !isNaN(Number(pp[1])) ){
-			basePage = Number(pp[1]) - Number(pp[0]) -1 ; //PDF内部的页码从0开始
+	if( !isStrEmpty(strStr) ){
+		var pp = strStr.split(strReg);
+		if( pp.length == 2 ){ //exact
+			pp[0] = strTrim(pp[0]); pp[1] = strTrim(pp[1]);
+			if( isInteger(pp[0]) && isInteger(pp[1]) ) {
+				basePage = Number(pp[1]) - Number(pp[0]) -1 ; //PDF内部的页码从0开始
+			}
 		}
 	}
 	return basePage;
 }
-
 function readBasePage(){
 	var PageRelative = app.response({
-			cQuestion : "输入书签页码和实际对应的页数(逗号分隔):",
+			cQuestion : "请输入: \n\t(书签页码,  实际的页码)(逗号分隔):",
 			cTitle : "页码起始设置",
-			cDefault : "1,1",
-			cLabel : "输入:"
+			cDefault : "1, 1",
+			cLabel : "请输入:"
 		});
 	var basePage = parseInputPage(PageRelative,/\,/); //逗号分隔
 	if( isStrNull(basePage) ){
-		app.alert("输入格式错误! " + PageRelative);
+		app.alert("输入格式错误:  " + PageRelative);
 	}
 	return basePage;
 }
@@ -113,12 +113,12 @@ function parseBookmarkArray(myArr,myLevel,myName,myPage){
 		var level = getLevelFromStr(myRow);
 		myLevel.push(level);
 		
-		myRow = myRow.replace(/(^\s*)|(\s*$)/g, "");//去掉头尾空白字符
+		myRow = strTrim(myRow);//去掉头尾空白字符
 		
 		var items = splitString(myRow,SEP_STR); //以Tab键或者连续4个空格切割字符串
 		if( items.length >=1) myName.push(items[0]);  //书签的名称
 		if( items.length >=2 ){
-			myPage.push(isNaN(Number(items[1]))?NO_PAGE_CHAR:Number(items[1]));  //书签的页码
+			myPage.push(isInteger(items[1])?Number(items[1]):NO_PAGE_CHAR);  //书签的页码
 		}else{
 			myPage.push(NO_PAGE_CHAR);    //no page found!
 		}
@@ -162,12 +162,12 @@ function createBookmark(bkm,cur,index,basePage,myLevel,myName,myPage){
 		else if( cur < myLevel[i] ){ //sub menu
 			if( bkm.children == null ){
 				//app.alert("Error: no parent node! " + myName[i] + " " + myPage[i]); //Error
-				bkm.createChild(myName[i],"this.pageNum=" +((myPage[i]==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
+				bkm.createChild(myName[i],"this.pageNum=" +((String(myPage[i])==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
 				return i+1;
 			}
 			i = createBookmark(bkm.children[bkm.children.length-1],cur+1,i,basePage,myLevel,myName,myPage); //sub 
 		} else{//equal
-			bkm.createChild(myName[i],"this.pageNum=" +((myPage[i]==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
+			bkm.createChild(myName[i],"this.pageNum=" +((String(myPage[i])==NO_PAGE_CHAR)?"":basePage+myPage[i])+ ";",bkm.children==null?0:bkm.children.length);
 			i++; //next element
 		} // end if
 	}//end of while
@@ -244,6 +244,7 @@ function importBookmark() {
 	var basePage = readBasePage();
 	if( isStrNull(basePage) ) return;
 	
+	//app.alert("basePage=" + basePage + ",level=" + myLevel+",name=" + myName+",page=" + myPage);
 	validateBookmark(myLevel,myName,myPage); //check bookmark error!
 	
 	this.bookmarkRoot.remove();
