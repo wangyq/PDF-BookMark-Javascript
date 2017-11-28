@@ -78,10 +78,10 @@ function parseInputPage(strStr,strReg){
 }
 function readBasePage(){
 	var PageRelative = app.response({
-			cQuestion : "请输入: \n\t(书签页码,  实际的页码)(逗号分隔):",
+			cQuestion : "书签页码和实际页面的对应关系设置 \n\n\n",
 			cTitle : "页码起始设置",
 			cDefault : "1, 1",
-			cLabel : "请输入:"
+			cLabel : "请输入 (书签页码, 实际页面): "
 		});
 	var basePage = parseInputPage(PageRelative,/\,/); //逗号分隔
 	if( isStrNull(basePage) ){
@@ -198,14 +198,14 @@ function exportBookmarkString(doc,bkm){
 	var myLevel = new Array();
 	var myName = new Array();
 	var myPage = new Array();
+	var str = "";
 	
 	var basePage = readBasePage();
-	if( isStrNull(basePage) ) return;
+	if( isStrNull(basePage) ) return str;
 	basePage = 1 - basePage;  //real page index is 0
 	
 	exportBookmarkLevel(doc,bkm,0,myLevel,myName,myPage);
-	
-	var str = "";
+
 	var width = 76;
 	
 	for(var i=0;i<myLevel.length;i++){
@@ -282,6 +282,7 @@ function exportBookmark(){
 	var strCur = "# Time: " + util.printd("yyyy/mm/dd HH:MM:ss",new Date()) + "\r\n\r\n";
 	
 	var str = exportBookmarkString(this,this.bookmarkRoot);
+	if( isStrEmpty(str) ) return;
 	
 	var strOut = strComment + strFile + strCur + str ;
 	this.createDataObject("Bookmark.txt", "");
