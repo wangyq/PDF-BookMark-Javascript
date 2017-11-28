@@ -1,6 +1,7 @@
 //========================================================
 // PDF Bookmark export and import with Adobe Acrobat 
 // Author: siwind
+// SourceCode: https://github.com/wangyq/PDF-BookMark-Javascript
 // Mail:  yinqingwang@gmail.com
 // Date:  2017-11-20
 // Version: 1.0.2
