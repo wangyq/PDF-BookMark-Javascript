@@ -28,21 +28,29 @@ var NO_PAGE_CHAR = "";  //页码未设置
 //分隔符号的常量
 var SEP_CHAR="\t";
 var SEP_SPACE="    ";
-var SEP_STR=/\t|    /;
+var SEP_STR_IMP=/\t|    |　　/;
+var SEP_STR_EXP=/\r|\n|\t|   |　　/;
+var FULL_SPACE="　";
+var CR_NL="\r\n"
 
 function isStrNull(strStr){
 	if( strStr == null || strStr == undefined ){return true;}
 	return false;
 }
 function strTrim(strStr){//去掉头尾空白字符
-	if( !isStrNull(strStr) ) return strStr.replace(/(^\s*)|(\s*$)/g, "");
+	if( !isStrNull(strStr) ) return strStr.replace(/(^(\s|　)*)|((\s|　)*$)/g, "");
 	return "";
 }
 function isStrEmpty(strStr){
 	return strTrim(strStr).length == 0;
 }
 function isInteger(strStr){
-	return (/^(0|[1-9][0-9]*)$/).test(strTrim(String(strStr)));
+	return (/^[-\+]?\d+$/).test(strTrim(String(strStr)));
+}
+function StrLenWithCJK(str){
+    var len=0;
+    for(var i=0;i<str.length;i++){var c = str.charCodeAt(i);if ((c >= 0x0001 && c <= 0x007e) || (0xff60<=c && c<=0xff9f)) len++; else len +=2; }
+    return len;
 }
 function splitString(strStr,strReg){
 	var arrResult = new Array();
@@ -62,7 +70,7 @@ function parseInputPage(strStr,strReg){
 		if( pp.length == 2 ){ //exact
 			pp[0] = strTrim(pp[0]); pp[1] = strTrim(pp[1]);
 			if( isInteger(pp[0]) && isInteger(pp[1]) ) {
-				basePage = Number(pp[1]) - Number(pp[0]) -1 ; //PDF内部的页码从0开始
+				basePage = Number(pp[1]) - Number(pp[0]); 
 			}
 		}
 	}
@@ -94,6 +102,7 @@ function getLevelFromStr(strStr){
 	for(var i=0;i<strStr.length;i++){
 		if( strStr.substr(i,1) == SEP_CHAR ) l += 4;
 		else if ( strStr.substr(i,1) == " " ) l += 1;
+		else if ( strStr.substr(i,1) == FULL_SPACE ) l += 4;
 		else break;
 	}
 	var base = SEP_SPACE.length;
@@ -115,7 +124,7 @@ function parseBookmarkArray(myArr,myLevel,myName,myPage){
 		
 		myRow = strTrim(myRow);//去掉头尾空白字符
 		
-		var items = splitString(myRow,SEP_STR); //以Tab键或者连续4个空格切割字符串
+		var items = splitString(myRow,SEP_STR_IMP); //以Tab键或者连续4个空格切割字符串
 		if( items.length >=1) myName.push(items[0]);  //书签的名称
 		if( items.length >=2 ){
 			myPage.push(isInteger(items[1])?Number(items[1]):NO_PAGE_CHAR);  //书签的页码
@@ -178,7 +187,7 @@ function exportBookmarkLevel(doc,bkm,cur,myLevel,myName,myPage){
 	if( bkm.children == null ) return;
 	for( var i=0;i<bkm.children.length;i++){
 		myLevel.push(cur);
-		var bnames = splitString(bkm.children[i].name, /\r|\n|  /); //at least two white space
+		var bnames = splitString(bkm.children[i].name, SEP_STR_EXP); //at least two white space
 		myName.push(bnames.join(" "));
 		bkm.children[i].execute();
 		myPage.push(doc.pageNum);
@@ -190,24 +199,25 @@ function exportBookmarkString(doc,bkm){
 	var myName = new Array();
 	var myPage = new Array();
 	
+	var basePage = readBasePage();
+	if( isStrNull(basePage) ) return;
+	basePage = 1 - basePage;  //real page index is 0
+	
 	exportBookmarkLevel(doc,bkm,0,myLevel,myName,myPage);
 	
 	var str = "";
-	var width = 75;
-	var basePage = 1;
+	var width = 76;
+	
 	for(var i=0;i<myLevel.length;i++){
 		var l = myLevel[i];
 		var space = "";
-		var slen = l*4 + myName[i].length;
-		if( width <= slen ) space += "   ";
-		else {for(var j=0;j<width-slen;j++) space += " ";}
+		var slen = l*4 + StrLenWithCJK(myName[i]);
+		for(var j=0;j<width-slen;j++) space += " ";
 		
-		while(l>0){
-			str += SEP_CHAR; // "\t"
-			l--;
-		}
-		str += myName[i] + SEP_CHAR+SEP_CHAR +space ; //Tab键分隔
-		str += (myPage[i]+basePage) + "\n";
+		while(l>0){str += SEP_CHAR; l--; } //sub level with \t
+		
+		str += myName[i] + SEP_SPACE+ space ; //Space分隔
+		str += (myPage[i]+basePage) + CR_NL;
 	}
 	
 	doc.pageNum = 0; //this.pageNum = 0;  //got to first page
@@ -219,18 +229,18 @@ function exportBookmarkString(doc,bkm){
 //
 function importBookmark() {
 	//提示导入目录
-	if (!(this.importDataObject("txtBookmark"))) {
+	if (!(this.importDataObject("Bookmark"))) {
 		return
 	}
 	//检验目录是否TXT文本格式
-	var MyData = this.getDataObject("txtBookmark");
+	var MyData = this.getDataObject("Bookmark");
 	if (MyData["MIMEType"] != "text/plain") {
 		app.alert("请设置为TXT(UTF-8)格式！");
-		this.removeDataObject("txtBookmark");
+		this.removeDataObject("Bookmark");
 		return
 	}
 	
-	var MyStream = this.getDataObjectContents("txtBookmark");
+	var MyStream = this.getDataObjectContents("Bookmark");
 	var MyString = util.stringFromStream(MyStream, "utf-8");
 	var myArr = MyString.split("\n"); //保留Tab键供后续分析
 	
@@ -239,10 +249,11 @@ function importBookmark() {
 	var myPage = new Array();
 	
 	parseBookmarkArray(myArr,myLevel,myName,myPage); //parseBookmarkArray
-	this.removeDataObject("txtBookmark");  //清空内存
+	this.removeDataObject("Bookmark");  //清空内存
 
 	var basePage = readBasePage();
 	if( isStrNull(basePage) ) return;
+	basePage -= 1;  //real page index is 0
 	
 	validateBookmark(myLevel,myName,myPage); //check bookmark error!
 	
@@ -257,18 +268,18 @@ function importBookmark() {
 //---------------------------------
 //
 function exportBookmark(){
-	var strComment = "#==================================================\n" + 
-		"# 0) 每行格式: [多个空格键或者Tab键(可选)] [书签名称] [多个Tab键或者空格键] [页码] \n" +
-		"# 1) 以#开头的部分为注释, 空行自动忽略 \n" + 
-		"# 2) 书签文件必须以UTF-8格式编码 \n" + 
-		"# 3) 书签的缩进以Tab键或者连续4个空格键标记, 每个Tab键或者每4个空格缩进一级, 依次类推 \n" + 
-		"# 4) 书签的名称部分不能含有Tab键(Tab键为分隔符)或者连续4个空格及以上 \n" + 
-		"# 5) 书签的名称部分和页码部分的分隔符，以至少一个Tab键或者连续4个空格以上做为分隔标记 \n\n" + 
+	var strComment = "#==================================================\r\n" + 
+		"# 0) 每行格式: [多个空格键或者Tab键(可选)] [书签名称] [多个Tab键或者空格键] [页码] \r\n" +
+		"# 1) 以#开头的部分为注释, 空行自动忽略 \r\n" + 
+		"# 2) 书签文件必须以UTF-8格式编码 \r\n" + 
+		"# 3) 书签的缩进以Tab键或者连续4个空格键或者中文全角空格标记, 每个Tab键或者每4个空格或者1个中文全角空格缩进一级, 依次类推 \r\n" + 
+		"# 4) 书签的名称部分不能含有Tab键(Tab键为分隔符)或者连续3个空格或者连续2个全角空格及以上 \r\n" + 
+		"# 5) 书签的名称部分和页码部分的分隔符，以至少一个Tab键或者连续4个空格或者连续2个全角空格及以上做为分隔标记 \r\n\r\n" + 
 		"# 注: 可以使用文本编辑器的列选模式，先拷贝1个Tab键或者连续4空格，然后列选模式同时选择多列粘贴即可 " + 
-		"\n";
+		"\r\n";
 	
-	var strFile = "# Export File: " + this.path + "\n";
-	var strCur = "# Time: " + util.printd("yyyy/mm/dd HH:MM:ss",new Date()) + "\n\n";
+	var strFile = "# Export File: " + this.path + "\r\n";
+	var strCur = "# Time: " + util.printd("yyyy/mm/dd HH:MM:ss",new Date()) + "\r\n\r\n";
 	
 	var str = exportBookmarkString(this,this.bookmarkRoot);
 	
